@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Semáforo de Vínculos · Encuesta ESI</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚦</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.13.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.13.1/firebase-firestore-compat.min.js"></script>
+
+<style>
+/* =========================================================
+   ============  CONFIGURÁ ACÁ TUS DATOS  ===================
+   =========================================================== */
+</style>
+
+<style>
+:root{
+  --bg-deep:#1B1329;
+  --bg-deep-2:#241A38;
+  --card:#2B2145;
+  --card-2:#382A55;
+  --coral:#FF6B6B;
+  --coral-dim:#5A2E30;
+  --gold:#FFC857;
+  --gold-dim:#5C4A24;
+  --teal:#4ECDC4;
+  --teal-dim:#1F4A46;
+  --ink:#F7F1E8;
+  --ink-muted:#C9BFE0;
+  --ink-faint:#8B7FA8;
+  --radius:22px;
+  --shadow:0 20px 50px rgba(10,6,20,.45);
+  --font-display:'Fraunces', serif;
+  --font-body:'Plus Jakarta Sans', sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  min-height:100vh;
+  background:
+    radial-gradient(circle at 15% 10%, #2E2049 0%, transparent 45%),
+    radial-gradient(circle at 90% 80%, #24314A 0%, transparent 50%),
+    linear-gradient(160deg, var(--bg-deep) 0%, var(--bg-deep-2) 100%);
+  background-attachment:fixed;
+  color:var(--ink);
+  font-family:var(--font-body);
+  overflow-x:hidden;
+  -webkit-tap-highlight-color:transparent;
+}
+::selection{background:var(--gold);color:#241A38;}
+
+#app{
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  padding:24px 16px 60px;
+  position:relative;
+}
+
+.screen{
+  width:100%;
+  max-width:560px;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  animation:riseIn .6s cubic-bezier(.16,1,.3,1);
+}
+.screen.active{display:flex;}
+@keyframes riseIn{
+  from{opacity:0; transform:translateY(24px);}
+  to{opacity:1; transform:translateY(0);}
+}
+
+/* --- floating ambient shapes --- */
+.blob{
+  position:fixed; border-radius:50%; filter:blur(60px); opacity:.35; z-index:0; pointer-events:none;
+  animation:float 14s ease-in-out infinite;
+}
+.blob1{width:280px;height:280px;background:var(--coral);top:-80px;left:-80px;}
+.blob2{width:320px;height:320px;background:var(--teal);bottom:-100px;right:-100px;animation-delay:-4s;}
+.blob3{width:200px;height:200px;background:var(--gold);top:40%;right:-60px;animation-delay:-8s;}
+@keyframes float{
+  0%,100%{transform:translate(0,0) scale(1);}
+  50%{transform:translate(20px,-30px) scale(1.08);}
+}
+
+/* ========== DEVICE SELECT ========== */
+.device-card{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:40px 28px;
+  text-align:center;
+  box-shadow:var(--shadow);
+  width:100%;
+  position:relative;
+  z-index:1;
+  border:1px solid rgba(255,255,255,.06);
+}
+.traffic-emoji{font-size:52px; display:block; margin-bottom:6px; animation:pulseIcon 2.4s ease-in-out infinite;}
+@keyframes pulseIcon{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+.device-card h1{
+  font-family:var(--font-display);
+  font-weight:600;
+  font-size:26px;
+  margin:8px 0 4px;
+}
+.device-card p{color:var(--ink-muted); font-size:15px; margin:0 0 28px;}
+.device-options{display:flex; gap:14px; flex-wrap:wrap; justify-content:center;}
+.device-btn{
+  flex:1 1 140px;
+  background:var(--card-2);
+  border:2px solid transparent;
+  border-radius:18px;
+  padding:22px 12px;
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-weight:600;
+  font-size:15px;
+  cursor:pointer;
+  transition:transform .25s ease, border-color .25s ease, background .25s ease;
+  position:relative;
+}
+.device-btn .ico{font-size:34px; display:block; margin-bottom:8px;}
+.device-btn:hover{transform:translateY(-4px);}
+.device-btn.suggested{border-color:var(--teal); box-shadow:0 0 0 4px rgba(78,205,196,.15);}
+.device-btn.suggested::after{
+  content:"Sugerido";
+  position:absolute; top:-11px; left:50%; transform:translateX(-50%);
+  background:var(--teal); color:#0F332F; font-size:10.5px; font-weight:800;
+  padding:3px 10px; border-radius:20px; letter-spacing:.03em;
+}
+
+/* ========== INTRO / PORTADA ========== */
+.portada{
+  background:var(--card);
+  border-radius:var(--radius);
+  padding:38px 26px;
+  text-align:center;
+  box-shadow:var(--shadow);
+  width:100%;
+  position:relative;
+  z-index:1;
+  border:1px solid rgba(255,255,255,.06);
+  overflow:hidden;
+}
+.semaforo-mini{display:flex; gap:10px; justify-content:center; margin-bottom:18px;}
+.dot{width:14px;height:14px;border-radius:50%;}
+.dot.red{background:var(--coral); box-shadow:0 0 14px var(--coral);}
+.dot.yellow{background:var(--gold); box-shadow:0 0 14px var(--gold); animation-delay:.2s;}
+.dot.green{background:var(--teal); box-shadow:0 0 14px var(--teal); animation-delay:.4s;}
+.dot{animation:blink 1.8s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:.4;}50%{opacity:1;}}
+
+.eyebrow{
+  text-transform:uppercase; letter-spacing:.14em; font-size:12px; font-weight:700;
+  color:var(--gold); margin-bottom:10px;
+}
+.portada h1{
+  font-family:var(--font-display);
+  font-size:clamp(30px,7vw,42px);
+  font-weight:700;
+  line-height:1.05;
+  margin:0 0 10px;
+  background:linear-gradient(100deg, var(--ink) 30%, var(--teal) 80%);
+  -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+}
+.portada .subtitle{
+  font-size:16px; color:var(--ink-muted); margin:0 0 26px; line-height:1.5;
+}
+.meta-box{
+  background:var(--bg-deep); border-radius:16px; padding:16px 18px; margin-bottom:26px;
+  text-align:left; font-size:14px; color:var(--ink-muted);
+  border:1px solid rgba(255,255,255,.05);
+}
+.meta-box strong{color:var(--ink); font-weight:700;}
+.meta-row{display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed rgba(255,255,255,.08);}
+.meta-row:last-child{border-bottom:none;}
+
+.big-btn{
+  background:linear-gradient(120deg, var(--teal), #3AB3A9);
+  color:#0E2E2A; border:none; border-radius:16px; padding:17px 30px;
+  font-family:var(--font-body); font-weight:800; font-size:16px; cursor:pointer;
+  box-shadow:0 10px 26px rgba(78,205,196,.3);
+  transition:transform .2s ease, box-shadow .2s ease;
+  width:100%;
+}
+.big-btn:hover{transform:translateY(-2px); box-shadow:0 14px 32px rgba(78,205,196,.4);}
+.big-btn:active{transform:translateY(1px) scale(.99);}
+.big-btn.secondary{
+  background:transparent; color:var(--ink); border:1.5px solid var(--ink-faint); box-shadow:none; margin-top:10px;
+}
+.small-note{font-size:12.5px; color:var(--ink-faint); margin-top:16px;}
+
+/* ========== SURVEY ========== */
+.survey-wrap{width:100%; position:relative; z-index:1;}
+.progress-track{
+  width:100%; height:8px; background:var(--card); border-radius:20px; overflow:hidden; margin-bottom:10px;
+  border:1px solid rgba(255,255,255,.05);
+}
+.progress-fill{
+  height:100%; border-radius:20px; width:0%;
+  background:linear-gradient(90deg, var(--coral), var(--gold), var(--teal));
+  transition:width .5s cubic-bezier(.16,1,.3,1);
+}
+.progress-label{display:flex; justify-content:space-between; font-size:12.5px; color:var(--ink-faint); margin-bottom:20px;}
+
+.q-card{
+  background:var(--card); border-radius:var(--radius); padding:30px 24px; box-shadow:var(--shadow);
+  border:1px solid rgba(255,255,255,.06); width:100%;
+}
+.q-tag{
+  display:inline-block; font-size:11.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase;
+  padding:5px 12px; border-radius:20px; margin-bottom:14px;
+}
+.q-tag.tag-datos{background:var(--card-2); color:var(--ink-muted);}
+.q-tag.tag-saber{background:var(--gold-dim); color:var(--gold);}
+.q-tag.tag-vinculo{background:var(--coral-dim); color:var(--coral);}
+.q-tag.tag-voz{background:var(--teal-dim); color:var(--teal);}
+
+.q-text{
+  font-family:var(--font-display); font-size:clamp(19px,4.5vw,23px); font-weight:600; line-height:1.3; margin:0 0 22px;
+}
+.q-options{display:flex; flex-direction:column; gap:10px;}
+.opt-btn{
+  background:var(--bg-deep); border:1.5px solid rgba(255,255,255,.08); border-radius:14px;
+  padding:15px 16px; color:var(--ink); font-family:var(--font-body); font-size:15px; font-weight:600;
+  text-align:left; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px;
+  transition:all .18s ease;
+}
+.opt-btn:hover{border-color:var(--teal); background:#1F2E3D; transform:translateX(3px);}
+.opt-btn.selected{
+  border-color:var(--teal); background:var(--teal-dim); color:var(--teal);
+  animation:pop .3s ease;
+}
+.opt-btn .check{
+  width:20px;height:20px;border-radius:50%;border:2px solid currentColor;flex:none;
+  display:flex; align-items:center; justify-content:center; font-size:12px;
+}
+@keyframes pop{0%{transform:scale(.96);}60%{transform:scale(1.02);}100%{transform:scale(1);}}
+
+.q-text-input{
+  width:100%; background:var(--bg-deep); border:1.5px solid rgba(255,255,255,.08); border-radius:14px;
+  padding:14px 16px; color:var(--ink); font-family:var(--font-body); font-size:15px; resize:vertical; min-height:90px;
+}
+.q-text-input:focus{outline:none; border-color:var(--teal);}
+
+.q-nav{display:flex; gap:10px; margin-top:22px;}
+.nav-btn{
+  flex:1; padding:14px; border-radius:14px; border:none; font-weight:700; font-family:var(--font-body); font-size:14.5px; cursor:pointer;
+  transition:opacity .2s ease, transform .2s ease;
+}
+.nav-btn.back{background:var(--card-2); color:var(--ink-muted);}
+.nav-btn.next{background:linear-gradient(120deg, var(--gold), #E0A93E); color:#3A2A05;}
+.nav-btn:disabled{opacity:.35; cursor:not-allowed;}
+.nav-btn:not(:disabled):active{transform:scale(.97);}
+
+/* ========== RESULTS ========== */
+.results-wrap{width:100%; position:relative; z-index:1;}
+.result-head{text-align:center; margin-bottom:22px;}
+.result-head h2{font-family:var(--font-display); font-size:26px; margin:6px 0 4px;}
+.result-head p{color:var(--ink-muted); font-size:14px; margin:0;}
+
+.chart-card{
+  background:var(--card); border-radius:18px; padding:20px 18px 10px; margin-bottom:16px;
+  border:1px solid rgba(255,255,255,.06);
+}
+.chart-card h3{font-family:var(--font-body); font-size:14.5px; font-weight:700; margin:0 0 12px; color:var(--ink);}
+.chart-card .chart-box{position:relative; height:220px;}
+.chart-note{font-size:11.5px; color:var(--ink-faint); text-align:center; margin:14px 0 4px;}
+
+/* ========== FINAL PHRASE ========== */
+.final-card{
+  background:var(--card); border-radius:var(--radius); padding:40px 26px; text-align:center;
+  box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.06); width:100%; position:relative; z-index:1; overflow:hidden;
+}
+.gauge-wrap{position:relative; width:220px; height:130px; margin:0 auto 14px;}
+.final-emoji{font-size:44px; margin-bottom:6px;}
+.final-card h2{font-family:var(--font-display); font-size:24px; margin:6px 0 14px;}
+.final-phrase{
+  font-family:var(--font-display); font-style:italic; font-size:19px; line-height:1.5; color:var(--ink);
+  padding:0 4px; margin-bottom:22px;
+}
+.resource-box{
+  background:var(--bg-deep); border-radius:14px; padding:14px 16px; font-size:13px; color:var(--ink-muted);
+  text-align:left; margin-bottom:20px; border:1px solid rgba(255,255,255,.05);
+}
+.resource-box b{color:var(--gold);}
+
+/* confetti */
+.confetti-piece{
+  position:fixed; top:-10px; width:9px; height:14px; z-index:50; pointer-events:none;
+  animation:fall linear forwards;
+}
+@keyframes fall{
+  to{transform:translateY(110vh) rotate(540deg); opacity:.2;}
+}
+
+/* ========== ADMIN ========== */
+.admin-trigger{
+  position:fixed; bottom:14px; right:14px; z-index:40;
+  width:38px; height:38px; border-radius:50%; background:rgba(43,33,69,.7);
+  border:1px solid rgba(255,255,255,.1); color:var(--ink-faint); font-size:15px;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; backdrop-filter:blur(6px);
+}
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(10,6,20,.72); z-index:100; display:none;
+  align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px);
+}
+.modal-overlay.active{display:flex;}
+.modal-box{
+  background:var(--card); border-radius:20px; padding:28px 24px; max-width:420px; width:100%;
+  border:1px solid rgba(255,255,255,.08); box-shadow:var(--shadow); max-height:85vh; overflow-y:auto;
+}
+.modal-box h3{font-family:var(--font-display); margin:0 0 14px; font-size:20px;}
+.modal-box input[type=password], .modal-box input[type=text]{
+  width:100%; background:var(--bg-deep); border:1.5px solid rgba(255,255,255,.08); border-radius:12px;
+  padding:12px 14px; color:var(--ink); font-family:var(--font-body); font-size:15px; margin-bottom:12px;
+}
+.modal-box .err{color:var(--coral); font-size:13px; margin:-6px 0 12px; display:none;}
+.close-x{position:absolute; top:14px; right:16px; background:none; border:none; color:var(--ink-faint); font-size:20px; cursor:pointer;}
+.admin-wide{max-width:640px;}
+.admin-stats{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px;}
+.stat-pill{background:var(--bg-deep); border-radius:12px; padding:10px 14px; flex:1; min-width:110px; text-align:center; border:1px solid rgba(255,255,255,.05);}
+.stat-pill b{display:block; font-size:20px; font-family:var(--font-display); color:var(--teal);}
+.stat-pill span{font-size:11px; color:var(--ink-faint);}
+.admin-table-wrap{overflow-x:auto; margin-top:14px; border-radius:12px; border:1px solid rgba(255,255,255,.06);}
+table.admin-table{width:100%; border-collapse:collapse; font-size:12.5px;}
+table.admin-table th, table.admin-table td{padding:8px 10px; text-align:left; border-bottom:1px solid rgba(255,255,255,.06); white-space:nowrap;}
+table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position:sticky; top:0;}
+.loader{display:flex; align-items:center; gap:8px; color:var(--ink-muted); font-size:13.5px; padding:10px 0;}
+.spinner{width:16px;height:16px;border-radius:50%;border:2.5px solid var(--card-2); border-top-color:var(--teal); animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+@media (min-width:700px){
+  body.device-desktop .screen{max-width:640px;}
+  body.device-desktop .device-btn{padding:30px 16px;}
+  body.device-desktop .portada{padding:52px 46px;}
+  body.device-desktop .q-card{padding:40px 42px;}
+}
+</style>
+</head>
+<body>
+
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="blob blob3"></div>
+
+<div id="app">
+
+  <!-- ============ SCREEN: DEVICE SELECT ============ -->
+  <section class="screen active" id="screen-device">
+    <div class="device-card">
+      <span class="traffic-emoji">🚦</span>
+      <h1>¿Desde dónde nos visitás?</h1>
+      <p>Así acomodamos la pantalla a tu medida.</p>
+      <div class="device-options">
+        <button class="device-btn" id="btn-mobile" onclick="selectDevice('mobile')">
+          <span class="ico">📱</span>Celular
+        </button>
+        <button class="device-btn" id="btn-desktop" onclick="selectDevice('desktop')">
+          <span class="ico">💻</span>Compu
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: PORTADA ============ -->
+  <section class="screen" id="screen-intro">
+    <div class="portada">
+      <div class="semaforo-mini">
+        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      </div>
+      <div class="eyebrow" id="tema-eyebrow">Educación Sexual Integral</div>
+      <h1 id="titulo-portada">Semáforo de Vínculos</h1>
+      <p class="subtitle" id="subtitulo-portada">Consentimiento y relaciones sanas</p>
+      <div class="meta-box">
+        <div class="meta-row"><span>Creado por</span><strong id="meta-autores">—</strong></div>
+        <div class="meta-row"><span>Curso</span><strong id="meta-curso">—</strong></div>
+        <div class="meta-row"><span>Duración</span><strong>≈ 3 minutos</strong></div>
+      </div>
+      <button class="big-btn" onclick="startSurvey()">Empezar la encuesta →</button>
+      <p class="small-note">Es anónima. Tus respuestas nos ayudan a pensar mejor este tema en la escuela.</p>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: SURVEY ============ -->
+  <section class="screen" id="screen-survey">
+    <div class="survey-wrap">
+      <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="progress-label"><span id="progress-text">Pregunta 1 de 15</span><span id="progress-pct">0%</span></div>
+      <div class="q-card" id="q-card"></div>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: RESULTS ============ -->
+  <section class="screen" id="screen-results">
+    <div class="results-wrap">
+      <div class="result-head">
+        <span style="font-size:38px;">📊</span>
+        <h2>Así respondió el grupo</h2>
+        <p id="results-subtitle">Cargando respuestas...</p>
+      </div>
+      <div id="charts-container"></div>
+      <button class="big-btn" onclick="goFinal()">Ver mi mensaje final →</button>
+    </div>
+  </section>
+
+  <!-- ============ SCREEN: FINAL PHRASE ============ -->
+  <section class="screen" id="screen-final">
+    <div class="final-card" id="final-card">
+      <div class="gauge-wrap"><canvas id="gauge-canvas" width="220" height="130"></canvas></div>
+      <div class="final-emoji" id="final-emoji">🌱</div>
+      <h2>Tu mensaje</h2>
+      <p class="final-phrase" id="final-phrase">...</p>
+      <div class="resource-box">
+        <b>¿Necesitás hablar con alguien?</b><br>
+        Línea 144 (violencia de género, las 24 hs) · Un/a docente, preceptor/a o adulto de confianza también puede ayudarte a buscar información y acompañamiento.
+      </div>
+      <button class="big-btn secondary" onclick="restartSurvey()">Responder de nuevo</button>
+    </div>
+  </section>
+
+</div>
+
+<div class="admin-trigger" onclick="openAdminLogin()" title="Panel docente">🔒</div>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="modal-overlay" id="admin-login-modal">
+  <div class="modal-box" style="position:relative;">
+    <button class="close-x" onclick="closeModal('admin-login-modal')">✕</button>
+    <h3>🔒 Panel docente</h3>
+    <input type="password" id="admin-pass-input" placeholder="Contraseña">
+    <p class="err" id="admin-err">Contraseña incorrecta.</p>
+    <button class="big-btn" onclick="tryAdminLogin()">Ingresar</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL MODAL -->
+<div class="modal-overlay" id="admin-panel-modal">
+  <div class="modal-box admin-wide" style="position:relative;">
+    <button class="close-x" onclick="closeModal('admin-panel-modal')">✕</button>
+    <h3>📋 Respuestas recibidas</h3>
+    <div class="admin-stats" id="admin-stats"></div>
+    <button class="nav-btn back" style="margin-bottom:10px;" onclick="exportCSV()">⬇ Descargar CSV</button>
+    <div class="loader" id="admin-loader"><div class="spinner"></div> Cargando datos de Firebase...</div>
+    <div class="admin-table-wrap" id="admin-table-wrap" style="display:none;">
+      <table class="admin-table" id="admin-table"></table>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =====================================================================
+   ⚙️  CONFIGURACIÓN — EDITÁ ESTOS DATOS ANTES DE PUBLICAR LA PÁGINA
+   ===================================================================== */
+const CONFIG = {
+  autores: "Nombre y Apellido 1, Nombre y Apellido 2",
+  curso: "5° 2ª",
+  tema: "Educación Sexual Integral",
+  tituloPortada: "Semáforo de Vínculos",
+  subtituloPortada: "Consentimiento y relaciones sanas",
+  adminPassword: "esi2026",
+
+  // Pegá acá la configuración de TU proyecto de Firebase
+  // (Firebase console → Configuración del proyecto → Tus apps → SDK setup and configuration)
+  firebaseConfig: {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROYECTO.firebaseapp.com",
+    projectId: "TU_PROYECTO",
+    storageBucket: "TU_PROYECTO.appspot.com",
+    messagingSenderId: "000000000000",
+    appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
+  },
+  firestoreCollection: "respuestas_esi_consentimiento"
+};
+
+document.getElementById('meta-autores').textContent = CONFIG.autores;
+document.getElementById('meta-curso').textContent = CONFIG.curso;
+document.getElementById('tema-eyebrow').textContent = CONFIG.tema;
+document.getElementById('titulo-portada').textContent = CONFIG.tituloPortada;
+document.getElementById('subtitulo-portada').textContent = CONFIG.subtituloPortada;
+
+/* =====================================================================
+   FIREBASE INIT (modo seguro: si no configuraste las claves, la app
+   sigue funcionando pero guarda los datos solo en este navegador)
+   ===================================================================== */
+let db = null;
+let firebaseReady = false;
+try{
+  if(CONFIG.firebaseConfig.apiKey !== "TU_API_KEY"){
+    firebase.initializeApp(CONFIG.firebaseConfig);
+    db = firebase.firestore();
+    firebaseReady = true;
+  }
+}catch(e){ console.warn("Firebase no inicializado:", e); }
+
+/* =====================================================================
+   PREGUNTAS
+   score: 1 = respuesta "sana", 0.5 = intermedia, 0 = requiere aprender más
+   (solo se usa para el mensaje final, nunca para juzgar a nadie)
+   ===================================================================== */
+const QUESTIONS = [
+  { id:"edad", tag:"Datos", type:"single", text:"¿Qué edad tenés?",
+    options:[{l:"13 o menos"},{l:"14 - 15"},{l:"16 - 17"},{l:"18 o más"}] },
+  { id:"curso", tag:"Datos", type:"single", text:"¿A qué año vas?",
+    options:[{l:"1°"},{l:"2°"},{l:"3°"},{l:"4°"},{l:"5°"},{l:"6°"}] },
+  { id:"genero", tag:"Datos", type:"single", text:"¿Con qué género te identificás?",
+    options:[{l:"Femenino"},{l:"Masculino"},{l:"No binario"},{l:"Prefiero no decirlo"}] },
+  { id:"sabe_consentimiento", tag:"Saber", type:"single", text:"¿Sabés qué significa \"consentimiento\" en una relación?",
+    options:[{l:"Sí",score:1},{l:"Más o menos",score:.5},{l:"No",score:0}] },
+  { id:"retractar", tag:"Saber", type:"single", text:"¿Creés que el consentimiento se puede retractar en cualquier momento, incluso durante algo que ya empezó?",
+    options:[{l:"Sí",score:1},{l:"No sé",score:.5},{l:"No",score:0}] },
+  { id:"silencio", tag:"Saber", type:"single", text:"¿El silencio o la falta de un \"no\" significa que hay consentimiento?",
+    options:[{l:"No",score:1},{l:"Depende",score:.5},{l:"Sí",score:0}] },
+  { id:"se_habla", tag:"Saber", type:"single", text:"¿En tu escuela se habla de este tema?",
+    options:[{l:"Mucho"},{l:"Poco"},{l:"Nada"}] },
+  { id:"senales_toxicas", tag:"Vínculo", type:"multi", text:"¿Cuáles considerás señales de una relación tóxica? (elegí todas las que apliquen)",
+    options:[{l:"Celos excesivos"},{l:"Controlar el celular"},{l:"Aislar de amigos/as"},{l:"Controlar la vestimenta"},{l:"Ninguna de las anteriores"}] },
+  { id:"vivio_control", tag:"Vínculo", type:"single", text:"¿Alguna vez viviste o viste en tu entorno una situación de control o presión en una pareja?",
+    options:[{l:"Sí"},{l:"No"},{l:"Prefiero no responder"}] },
+  { id:"celos_amor", tag:"Vínculo", type:"single", text:"¿Los celos son una prueba de amor?",
+    options:[{l:"No",score:1},{l:"A veces",score:.5},{l:"Sí",score:0}] },
+  { id:"identificar_dano", tag:"Vínculo", type:"single", text:"¿Sabrías identificar cuándo una relación te hace mal?",
+    options:[{l:"Sí, siempre",score:1},{l:"A veces",score:.5},{l:"No sabría",score:0}] },
+  { id:"mas_esi", tag:"Voz", type:"single", text:"¿Te gustaría que se hable más de esto en la escuela?",
+    options:[{l:"Sí"},{l:"No"},{l:"Me da igual"}] },
+  { id:"donde_aprendio", tag:"Voz", type:"multi", text:"¿Dónde aprendiste más sobre estos temas?",
+    options:[{l:"Familia"},{l:"Escuela"},{l:"Redes sociales"},{l:"Amigos/as"},{l:"No aprendí"}] },
+  { id:"a_quien_ayuda", tag:"Voz", type:"single", text:"¿A quién le pedirías ayuda si vivís una situación de este tipo?",
+    options:[{l:"Familia"},{l:"Amigos/as"},{l:"Un/a docente"},{l:"Un/a profesional"},{l:"A nadie"}] },
+  { id:"que_cambiarias", tag:"Voz", type:"text", text:"¿Qué cambiarías en cómo se habla del tema en tu escuela? (opcional)" }
+];
+
+const TAG_CLASS = { "Datos":"tag-datos", "Saber":"tag-saber", "Vínculo":"tag-vinculo", "Voz":"tag-voz" };
+
+/* =====================================================================
+   ESTADO
+   ===================================================================== */
+let state = { device:null, qIndex:0, answers:{}, submitted:false, resultsData:null };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+/* =====================================================================
+   SONIDO (Web Audio API, sin archivos externos)
+   ===================================================================== */
+let actx;
+function audioCtx(){ if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); } return actx; }
+function tone(freq, dur, type, gain){
+  try{
+    const ctx = audioCtx();
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = type||'sine';
+    osc.frequency.value = freq;
+    g.gain.value = gain||0.06;
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + dur);
+    osc.stop(ctx.currentTime + dur);
+  }catch(e){}
+}
+function playClick(){ tone(520,0.09,'triangle',0.05); }
+function playSelect(){ tone(700,0.12,'sine',0.06); setTimeout(()=>tone(920,0.14,'sine',0.05),70); }
+function playSuccess(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.28,'sine',0.055),i*110)); }
+function playWhoosh(){ tone(180,0.25,'sawtooth',0.03); }
+
+/* =====================================================================
+   DEVICE SELECT
+   ===================================================================== */
+(function detectDevice(){
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+  const narrow = window.innerWidth < 820;
+  const suggested = (isTouch && narrow) ? 'mobile' : 'desktop';
+  document.getElementById(suggested === 'mobile' ? 'btn-mobile':'btn-desktop').classList.add('suggested');
+})();
+
+function selectDevice(d){
+  playClick();
+  state.device = d;
+  document.body.classList.remove('device-mobile','device-desktop');
+  document.body.classList.add('device-'+d);
+  show('screen-intro');
+}
+
+/* =====================================================================
+   SURVEY FLOW
+   ===================================================================== */
+function startSurvey(){
+  playWhoosh();
+  state.qIndex = 0;
+  show('screen-survey');
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q = QUESTIONS[state.qIndex];
+  const total = QUESTIONS.length;
+  const pct = Math.round((state.qIndex/total)*100);
+  document.getElementById('progress-fill').style.width = pct+"%";
+  document.getElementById('progress-text').textContent = `Pregunta ${state.qIndex+1} de ${total}`;
+  document.getElementById('progress-pct').textContent = pct+"%";
+
+  const card = document.getElementById('q-card');
+  let html = `<span class="q-tag ${TAG_CLASS[q.tag]}">${q.tag}</span><p class="q-text">${q.text}</p>`;
+
+  if(q.type === 'text'){
+    const val = state.answers[q.id]?.value || '';
+    html += `<textarea class="q-text-input" id="text-input" placeholder="Escribí tu respuesta acá...">${val}</textarea>`;
+  } else {
+    html += `<div class="q-options" id="opts-wrap">`;
+    q.options.forEach((o,i)=>{
+      const selected = q.type==='multi'
+        ? (state.answers[q.id]?.value||[]).includes(o.l)
+        : state.answers[q.id]?.value === o.l;
+      html += `<button type="button" class="opt-btn ${selected?'selected':''}" data-i="${i}" onclick="selectOption('${q.id}','${q.type}',${i})">
+        <span>${o.l}</span><span class="check">${selected?'✓':''}</span>
+      </button>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div class="q-nav">
+    <button class="nav-btn back" onclick="prevQuestion()" ${state.qIndex===0?'disabled':''}>← Atrás</button>
+    <button class="nav-btn next" id="next-btn" onclick="nextQuestion()">${state.qIndex===total-1?'Terminar →':'Siguiente →'}</button>
+  </div>`;
+
+  card.innerHTML = html;
+  updateNextButtonState();
+}
+
+function selectOption(qid, type, idx){
+  playSelect();
+  const q = QUESTIONS.find(x=>x.id===qid);
+  const opt = q.options[idx];
+  if(type === 'multi'){
+    if(!state.answers[qid]) state.answers[qid] = {value:[]};
+    const arr = state.answers[qid].value;
+    const pos = arr.indexOf(opt.l);
+    if(pos>-1) arr.splice(pos,1); else arr.push(opt.l);
+  } else {
+    state.answers[qid] = {value:opt.l, score: opt.score};
+  }
+  renderQuestion();
+}
+
+function updateNextButtonState(){
+  const q = QUESTIONS[state.qIndex];
+  const btn = document.getElementById('next-btn');
+  if(q.type === 'text'){ btn.disabled = false; return; }
+  const ans = state.answers[q.id];
+  const answered = q.type==='multi' ? (ans && ans.value.length>0) : (ans && ans.value);
+  btn.disabled = !answered;
+}
+
+function prevQuestion(){
+  playClick();
+  if(state.qIndex>0){ state.qIndex--; renderQuestion(); }
+}
+
+function nextQuestion(){
+  const q = QUESTIONS[state.qIndex];
+  if(q.type === 'text'){
+    const val = document.getElementById('text-input').value.trim();
+    state.answers[q.id] = {value: val};
+  }
+  playClick();
+  if(state.qIndex < QUESTIONS.length-1){
+    state.qIndex++;
+    renderQuestion();
+  } else {
+    finishSurvey();
+  }
+}
+
+/* =====================================================================
+   FINALIZAR + GUARDAR
+   ===================================================================== */
+async function finishSurvey(){
+  playSuccess();
+  const payload = { timestamp: new Date().toISOString() };
+  QUESTIONS.forEach(q=>{ payload[q.id] = state.answers[q.id]?.value ?? null; });
+
+  if(firebaseReady && db){
+    try{
+      await db.collection(CONFIG.firestoreCollection).add(payload);
+    }catch(e){ console.warn("No se pudo guardar en Firebase:", e); }
+  } else {
+    const local = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
+    local.push(payload);
+    localStorage.setItem('esi_respuestas_local', JSON.stringify(local));
+  }
+
+  await loadAggregateResults();
+  show('screen-results');
+  renderAllCharts();
+}
+
+/* =====================================================================
+   RESULTADOS AGREGADOS
+   ===================================================================== */
+async function loadAggregateResults(){
+  let all = [];
+  if(firebaseReady && db){
+    try{
+      const snap = await db.collection(CONFIG.firestoreCollection).get();
+      snap.forEach(doc=>all.push(doc.data()));
+    }catch(e){ console.warn(e); }
+  }
+  if(all.length === 0){
+    all = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
+  }
+  state.resultsData = all;
+  document.getElementById('results-subtitle').textContent =
+    all.length > 1 ? `Basado en ${all.length} respuestas` : `Sos la primera persona en responder — ¡gracias!`;
+}
+
+const chartInstances = [];
+function renderAllCharts(){
+  chartInstances.forEach(c=>c.destroy());
+  chartInstances.length = 0;
+  const container = document.getElementById('charts-container');
+  container.innerHTML = '';
+  const data = state.resultsData || [];
+
+  QUESTIONS.forEach(q=>{
+    if(q.type === 'text') return;
+    const counts = {};
+    q.options.forEach(o=>counts[o.l]=0);
+    data.forEach(row=>{
+      const val = row[q.id];
+      if(val==null) return;
+      if(Array.isArray(val)){ val.forEach(v=>{ if(counts[v]!=null) counts[v]++; }); }
+      else if(counts[val]!=null){ counts[val]++; }
+    });
+
+    const card = document.createElement('div');
+    card.className = 'chart-card';
+    card.innerHTML = `<h3>${q.text}</h3><div class="chart-box"><canvas></canvas></div>`;
+    container.appendChild(card);
+    const ctx = card.querySelector('canvas').getContext('2d');
+
+    const palette = ['#FF6B6B','#FFC857','#4ECDC4','#B79CED','#7FB2E5','#F79FB0'];
+    const inst = new Chart(ctx, {
+      type: q.type==='multi' ? 'bar' : 'doughnut',
+      data:{
+        labels:Object.keys(counts),
+        datasets:[{
+          data:Object.values(counts),
+          backgroundColor:palette,
+          borderWidth:0,
+          borderRadius: q.type==='multi'?8:0
+        }]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        indexAxis: q.type==='multi' ? 'y' : 'x',
+        plugins:{
+          legend:{ display:q.type!=='multi', position:'bottom', labels:{color:'#C9BFE0', font:{size:11}, boxWidth:12} },
+          tooltip:{ callbacks:{} }
+        },
+        scales: q.type==='multi' ? {
+          x:{ ticks:{color:'#C9BFE0', precision:0}, grid:{color:'rgba(255,255,255,.06)'} },
+          y:{ ticks:{color:'#C9BFE0', font:{size:11}}, grid:{display:false} }
+        } : {}
+      }
+    });
+    chartInstances.push(inst);
+  });
+}
+
+/* =====================================================================
+   MENSAJE FINAL PERSONALIZADO
+   ===================================================================== */
+function computeScore(){
+  const scored = QUESTIONS.filter(q=>q.options && q.options.some(o=>o.score!==undefined));
+  let total=0, max=0;
+  scored.forEach(q=>{
+    const ans = state.answers[q.id];
+    if(ans && ans.score !== undefined){ total += ans.score; max += 1; }
+    else { max += 1; }
+  });
+  return max>0 ? Math.round((total/max)*100) : 50;
+}
+
+function goFinal(){
+  playWhoosh();
+  const score = computeScore();
+  show('screen-final');
+  drawGauge(score);
+  const emojiEl = document.getElementById('final-emoji');
+  const phraseEl = document.getElementById('final-phrase');
+
+  let emoji, phrase;
+  if(score >= 75){
+    emoji = "🌟";
+    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean: eso también es cuidar.";
+  } else if(score >= 45){
+    emoji = "🌤️";
+    phrase = "Vas construyendo una mirada cada vez más clara sobre el consentimiento y los vínculos sanos. Seguir informándote y hablando del tema te va a dar todavía más herramientas.";
+  } else {
+    emoji = "🌱";
+    phrase = "Este es un buen momento para seguir aprendiendo sobre consentimiento y vínculos sanos. Nadie nace sabiendo esto: informarte es un acto de cuidado hacia vos y hacia los demás.";
+  }
+  emojiEl.textContent = emoji;
+  phraseEl.textContent = phrase;
+  launchConfetti();
+}
+
+function drawGauge(score){
+  const canvas = document.getElementById('gauge-canvas');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  const cx = w/2, cy = h-10, r = 90;
+
+  function arc(startDeg,endDeg,color){
+    ctx.beginPath();
+    ctx.arc(cx,cy,r, Math.PI + startDeg*Math.PI/180, Math.PI + endDeg*Math.PI/180);
+    ctx.lineWidth = 18;
+    ctx.strokeStyle = color;
+    ctx.lineCap='round';
+    ctx.stroke();
+  }
+  arc(0,60,'#FF6B6B');
+  arc(60,120,'#FFC857');
+  arc(120,180,'#4ECDC4');
+
+  const angle = Math.PI + (score/100)*Math.PI;
+  const nx = cx + Math.cos(angle)*(r-26);
+  const ny = cy + Math.sin(angle)*(r-26);
+  ctx.beginPath();
+  ctx.moveTo(cx,cy);
+  ctx.lineTo(nx,ny);
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#F7F1E8';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(cx,cy,7,0,Math.PI*2);
+  ctx.fillStyle = '#F7F1E8';
+  ctx.fill();
+
+  ctx.font = "700 13px 'Plus Jakarta Sans'";
+  ctx.fillStyle = '#C9BFE0';
+  ctx.textAlign='center';
+  ctx.fillText('tu recorrido', cx, cy+24);
+}
+
+function launchConfetti(){
+  const colors = ['#FF6B6B','#FFC857','#4ECDC4','#F7F1E8'];
+  for(let i=0;i<40;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.left = Math.random()*100+'vw';
+    el.style.background = colors[Math.floor(Math.random()*colors.length)];
+    el.style.animationDuration = (2.5+Math.random()*2)+'s';
+    el.style.opacity = 0.7+Math.random()*0.3;
+    document.body.appendChild(el);
+    setTimeout(()=>el.remove(), 5000);
+  }
+}
+
+function restartSurvey(){
+  state.qIndex = 0;
+  state.answers = {};
+  show('screen-intro');
+}
+
+/* =====================================================================
+   ADMIN
+   ===================================================================== */
+function openAdminLogin(){ document.getElementById('admin-login-modal').classList.add('active'); }
+function closeModal(id){ document.getElementById(id).classList.remove('active'); }
+
+function tryAdminLogin(){
+  const val = document.getElementById('admin-pass-input').value;
+  const err = document.getElementById('admin-err');
+  if(val === CONFIG.adminPassword){
+    err.style.display='none';
+    document.getElementById('admin-pass-input').value='';
+    closeModal('admin-login-modal');
+    document.getElementById('admin-panel-modal').classList.add('active');
+    loadAdminPanel();
+  } else {
+    err.style.display='block';
+  }
+}
+
+async function loadAdminPanel(){
+  document.getElementById('admin-loader').style.display='flex';
+  document.getElementById('admin-table-wrap').style.display='none';
+
+  let all = [];
+  if(firebaseReady && db){
+    try{
+      const snap = await db.collection(CONFIG.firestoreCollection).orderBy('timestamp','desc').get();
+      snap.forEach(doc=>all.push(doc.data()));
+    }catch(e){ console.warn(e); }
+  }
+  if(all.length===0){
+    all = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]').reverse();
+  }
+  window.__adminData = all;
+
+  document.getElementById('admin-loader').style.display='none';
+  document.getElementById('admin-stats').innerHTML = `
+    <div class="stat-pill"><b>${all.length}</b><span>respuestas totales</span></div>
+    <div class="stat-pill"><b>${firebaseReady?'Firebase':'Local'}</b><span>fuente de datos</span></div>
+  `;
+
+  const cols = ['timestamp', ...QUESTIONS.map(q=>q.id)];
+  let thead = '<tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr>';
+  let rows = all.map(r=>{
+    return '<tr>' + cols.map(c=>{
+      let v = r[c];
+      if(Array.isArray(v)) v = v.join(', ');
+      return `<td>${v ?? '—'}</td>`;
+    }).join('') + '</tr>';
+  }).join('');
+  document.getElementById('admin-table').innerHTML = thead + rows;
+  document.getElementById('admin-table-wrap').style.display='block';
+}
+
+function exportCSV(){
+  const all = window.__adminData || [];
+  if(all.length===0){ alert('Todavía no hay respuestas para exportar.'); return; }
+  const cols = ['timestamp', ...QUESTIONS.map(q=>q.id)];
+  let csv = cols.join(',') + '\n';
+  all.forEach(r=>{
+    csv += cols.map(c=>{
+      let v = r[c];
+      if(Array.isArray(v)) v = v.join(' | ');
+      v = (v===undefined||v===null) ? '' : String(v).replace(/"/g,'""');
+      return `"${v}"`;
+    }).join(',') + '\n';
+  });
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'respuestas_esi.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>
