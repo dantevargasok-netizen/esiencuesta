@@ -461,22 +461,22 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
    ⚙️  CONFIGURACIÓN — EDITÁ ESTOS DATOS ANTES DE PUBLICAR LA PÁGINA
    ===================================================================== */
 const CONFIG = {
-  autores: "Nombre y Apellido 1, Nombre y Apellido 2",
+  autores: "Tomas Vargas, Morena Behrendt, Emanuel Eiring, Gabriel Britos",
   curso: "5° 2ª",
   tema: "Educación Sexual Integral",
   tituloPortada: "Semáforo de Vínculos",
   subtituloPortada: "Consentimiento y relaciones sanas",
-  adminPassword: "esi2026",
+  adminPassword: "esiencuesta2026",
 
   // Pegá acá la configuración de TU proyecto de Firebase
   // (Firebase console → Configuración del proyecto → Tus apps → SDK setup and configuration)
   firebaseConfig: {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_PROYECTO.firebaseapp.com",
-    projectId: "TU_PROYECTO",
-    storageBucket: "TU_PROYECTO.appspot.com",
-    messagingSenderId: "000000000000",
-    appId: "1:000000000000:web:xxxxxxxxxxxxxxxx"
+    apiKey: "AIzaSyAJyjMSazQMaM_vIz4YFQjXGEUZtEOr7t8",
+    authDomain: "esiencuesta.firebaseapp.com",
+    projectId: "esiencuesta",
+    storageBucket: "esiencuesta.firebasestorage.app",
+    messagingSenderId: "223601916290",
+    appId: "1:223601916290:web:7f67fecff3c48e395df79b"
   },
   firestoreCollection: "respuestas_esi_consentimiento"
 };
@@ -519,13 +519,13 @@ const QUESTIONS = [
     options:[{l:"Sí",score:1},{l:"No sé",score:.5},{l:"No",score:0}] },
   { id:"silencio", tag:"Saber", type:"single", text:"¿El silencio o la falta de un \"no\" significa que hay consentimiento?",
     options:[{l:"No",score:1},{l:"Depende",score:.5},{l:"Sí",score:0}] },
-  { id:"se_habla", tag:"Saber", type:"single", text:"¿En tu escuela se habla de este tema?",
+  { id:"se_habla", tag:"Saber", type:"single", text:"¿Se hablo de este tema en tu salon alguna vez?",
     options:[{l:"Mucho"},{l:"Poco"},{l:"Nada"}] },
   { id:"senales_toxicas", tag:"Vínculo", type:"multi", text:"¿Cuáles considerás señales de una relación tóxica? (elegí todas las que apliquen)",
-    options:[{l:"Celos excesivos"},{l:"Controlar el celular"},{l:"Aislar de amigos/as"},{l:"Controlar la vestimenta"},{l:"Ninguna de las anteriores"}] },
-  { id:"vivio_control", tag:"Vínculo", type:"single", text:"¿Alguna vez viviste o viste en tu entorno una situación de control o presión en una pareja?",
+    options:[{l:"Que te obligue a preguntarle si podes salir a cualquier lugar"},{l:"Tener tus cuentas de Instagram"},{l:"Aislar de amigos/as"},{l:"Controlar la vestimenta"},{l:"Ninguna de las anteriores"}] },
+  { id:"vivio_control", tag:"Vínculo", type:"single", text:"¿Alguna vez viviste o viste en tu entorno una situación de control o "toxicidad" en una pareja?",
     options:[{l:"Sí"},{l:"No"},{l:"Prefiero no responder"}] },
-  { id:"celos_amor", tag:"Vínculo", type:"single", text:"¿Los celos son una prueba de amor?",
+  { id:"celos_amor", tag:"Vínculo", type:"single", text:"Los celos ¿son una prueba de amor?",
     options:[{l:"No",score:1},{l:"A veces",score:.5},{l:"Sí",score:0}] },
   { id:"identificar_dano", tag:"Vínculo", type:"single", text:"¿Sabrías identificar cuándo una relación te hace mal?",
     options:[{l:"Sí, siempre",score:1},{l:"A veces",score:.5},{l:"No sabría",score:0}] },
@@ -804,13 +804,13 @@ function goFinal(){
   let emoji, phrase;
   if(score >= 75){
     emoji = "🌟";
-    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean: eso también es cuidar.";
+    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean. Eso también es cuidar!";
   } else if(score >= 45){
     emoji = "🌤️";
     phrase = "Vas construyendo una mirada cada vez más clara sobre el consentimiento y los vínculos sanos. Seguir informándote y hablando del tema te va a dar todavía más herramientas.";
   } else {
     emoji = "🌱";
-    phrase = "Este es un buen momento para seguir aprendiendo sobre consentimiento y vínculos sanos. Nadie nace sabiendo esto: informarte es un acto de cuidado hacia vos y hacia los demás.";
+    phrase = "Este es un buen momento para seguir aprendiendo sobre consentimiento y vínculos sanos. Nadie nace sabiendo esto. Informarte es un acto de cuidado hacia vos y hacia los demás.";
   }
   emojiEl.textContent = emoji;
   phraseEl.textContent = phrase;
