@@ -13,12 +13,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.13.1/firebase-firestore-compat.min.js"></script>
 
 <style>
-/* =========================================================
-   ============  CONFIGURÁ ACÁ TUS DATOS  ===================
-   =========================================================== */
-</style>
-
-<style>
 :root{
   --bg-deep:#1B1329;
   --bg-deep-2:#241A38;
@@ -78,7 +72,6 @@ body{
   to{opacity:1; transform:translateY(0);}
 }
 
-/* --- floating ambient shapes --- */
 .blob{
   position:fixed; border-radius:50%; filter:blur(60px); opacity:.35; z-index:0; pointer-events:none;
   animation:float 14s ease-in-out infinite;
@@ -91,7 +84,6 @@ body{
   50%{transform:translate(20px,-30px) scale(1.08);}
 }
 
-/* ========== DEVICE SELECT ========== */
 .device-card{
   background:var(--card);
   border-radius:var(--radius);
@@ -137,7 +129,6 @@ body{
   padding:3px 10px; border-radius:20px; letter-spacing:.03em;
 }
 
-/* ========== INTRO / PORTADA ========== */
 .portada{
   background:var(--card);
   border-radius:var(--radius);
@@ -198,7 +189,6 @@ body{
 }
 .small-note{font-size:12.5px; color:var(--ink-faint); margin-top:16px;}
 
-/* ========== SURVEY ========== */
 .survey-wrap{width:100%; position:relative; z-index:1;}
 .progress-track{
   width:100%; height:8px; background:var(--card); border-radius:20px; overflow:hidden; margin-bottom:10px;
@@ -261,7 +251,6 @@ body{
 .nav-btn:disabled{opacity:.35; cursor:not-allowed;}
 .nav-btn:not(:disabled):active{transform:scale(.97);}
 
-/* ========== RESULTS ========== */
 .results-wrap{width:100%; position:relative; z-index:1;}
 .result-head{text-align:center; margin-bottom:22px;}
 .result-head h2{font-family:var(--font-display); font-size:26px; margin:6px 0 4px;}
@@ -275,7 +264,6 @@ body{
 .chart-card .chart-box{position:relative; height:220px;}
 .chart-note{font-size:11.5px; color:var(--ink-faint); text-align:center; margin:14px 0 4px;}
 
-/* ========== FINAL PHRASE ========== */
 .final-card{
   background:var(--card); border-radius:var(--radius); padding:40px 26px; text-align:center;
   box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.06); width:100%; position:relative; z-index:1; overflow:hidden;
@@ -293,7 +281,6 @@ body{
 }
 .resource-box b{color:var(--gold);}
 
-/* confetti */
 .confetti-piece{
   position:fixed; top:-10px; width:9px; height:14px; z-index:50; pointer-events:none;
   animation:fall linear forwards;
@@ -302,7 +289,6 @@ body{
   to{transform:translateY(110vh) rotate(540deg); opacity:.2;}
 }
 
-/* ========== ADMIN ========== */
 .admin-trigger{
   position:fixed; bottom:14px; right:14px; z-index:40;
   width:38px; height:38px; border-radius:50%; background:rgba(43,33,69,.7);
@@ -354,7 +340,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
 
 <div id="app">
 
-  <!-- ============ SCREEN: DEVICE SELECT ============ -->
   <section class="screen active" id="screen-device">
     <div class="device-card">
       <span class="traffic-emoji">🚦</span>
@@ -371,7 +356,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     </div>
   </section>
 
-  <!-- ============ SCREEN: PORTADA ============ -->
   <section class="screen" id="screen-intro">
     <div class="portada">
       <div class="semaforo-mini">
@@ -390,7 +374,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     </div>
   </section>
 
-  <!-- ============ SCREEN: SURVEY ============ -->
   <section class="screen" id="screen-survey">
     <div class="survey-wrap">
       <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
@@ -399,7 +382,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     </div>
   </section>
 
-  <!-- ============ SCREEN: RESULTS ============ -->
   <section class="screen" id="screen-results">
     <div class="results-wrap">
       <div class="result-head">
@@ -412,7 +394,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     </div>
   </section>
 
-  <!-- ============ SCREEN: FINAL PHRASE ============ -->
   <section class="screen" id="screen-final">
     <div class="final-card" id="final-card">
       <div class="gauge-wrap"><canvas id="gauge-canvas" width="220" height="130"></canvas></div>
@@ -431,7 +412,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
 
 <div class="admin-trigger" onclick="openAdminLogin()" title="Panel docente">🔒</div>
 
-<!-- ADMIN LOGIN MODAL -->
 <div class="modal-overlay" id="admin-login-modal">
   <div class="modal-box" style="position:relative;">
     <button class="close-x" onclick="closeModal('admin-login-modal')">✕</button>
@@ -442,7 +422,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
   </div>
 </div>
 
-<!-- ADMIN PANEL MODAL -->
 <div class="modal-overlay" id="admin-panel-modal">
   <div class="modal-box admin-wide" style="position:relative;">
     <button class="close-x" onclick="closeModal('admin-panel-modal')">✕</button>
@@ -457,9 +436,6 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
 </div>
 
 <script>
-/* =====================================================================
-   ⚙️  CONFIGURACIÓN — EDITÁ ESTOS DATOS ANTES DE PUBLICAR LA PÁGINA
-   ===================================================================== */
 const CONFIG = {
   autores: "Tomas Vargas, Morena Behrendt, Emanuel Eiring, Gabriel Britos",
   curso: "5° 2ª",
@@ -468,8 +444,6 @@ const CONFIG = {
   subtituloPortada: "Consentimiento y relaciones sanas",
   adminPassword: "esiencuesta2026",
 
-  // Pegá acá la configuración de TU proyecto de Firebase
-  // (Firebase console → Configuración del proyecto → Tus apps → SDK setup and configuration)
   firebaseConfig: {
     apiKey: "AIzaSyAJyjMSazQMaM_vIz4YFQjXGEUZtEOr7t8",
     authDomain: "esiencuesta.firebaseapp.com",
@@ -487,10 +461,6 @@ document.getElementById('tema-eyebrow').textContent = CONFIG.tema;
 document.getElementById('titulo-portada').textContent = CONFIG.tituloPortada;
 document.getElementById('subtitulo-portada').textContent = CONFIG.subtituloPortada;
 
-/* =====================================================================
-   FIREBASE INIT (modo seguro: si no configuraste las claves, la app
-   sigue funcionando pero guarda los datos solo en este navegador)
-   ===================================================================== */
 let db = null;
 let firebaseReady = false;
 try{
@@ -501,11 +471,6 @@ try{
   }
 }catch(e){ console.warn("Firebase no inicializado:", e); }
 
-/* =====================================================================
-   PREGUNTAS
-   score: 1 = respuesta "sana", 0.5 = intermedia, 0 = requiere aprender más
-   (solo se usa para el mensaje final, nunca para juzgar a nadie)
-   ===================================================================== */
 const QUESTIONS = [
   { id:"edad", tag:"Datos", type:"single", text:"¿Qué edad tenés?",
     options:[{l:"13 o menos"},{l:"14 - 15"},{l:"16 - 17"},{l:"18 o más"}] },
@@ -519,13 +484,13 @@ const QUESTIONS = [
     options:[{l:"Sí",score:1},{l:"No sé",score:.5},{l:"No",score:0}] },
   { id:"silencio", tag:"Saber", type:"single", text:"¿El silencio o la falta de un \"no\" significa que hay consentimiento?",
     options:[{l:"No",score:1},{l:"Depende",score:.5},{l:"Sí",score:0}] },
-  { id:"se_habla", tag:"Saber", type:"single", text:"¿Se hablo de este tema en tu salon alguna vez?",
+  { id:"se_habla", tag:"Saber", type:"single", text:"¿Se habló de este tema en tu salón alguna vez?",
     options:[{l:"Mucho"},{l:"Poco"},{l:"Nada"}] },
   { id:"senales_toxicas", tag:"Vínculo", type:"multi", text:"¿Cuáles considerás señales de una relación tóxica? (elegí todas las que apliquen)",
-    options:[{l:"Que te obligue a preguntarle si podes salir a cualquier lugar"},{l:"Tener tus cuentas de Instagram"},{l:"Aislar de amigos/as"},{l:"Controlar la vestimenta"},{l:"Ninguna de las anteriores"}] },
-  { id:"vivio_control", tag:"Vínculo", type:"single", text:"¿Alguna vez viviste o viste en tu entorno una situación de control o "toxicidad" en una pareja?",
+    options:[{l:"Que te obligue a preguntarle si podés salir a cualquier lugar"},{l:"Tener tus cuentas de Instagram"},{l:"Aislar de amigos/as"},{l:"Controlar la vestimenta"},{l:"Ninguna de las anteriores"}] },
+  { id:"vivio_control", tag:"Vínculo", type:"single", text:"¿Alguna vez viviste o viste en tu entorno una situación de control o \"toxicidad\" en una pareja?",
     options:[{l:"Sí"},{l:"No"},{l:"Prefiero no responder"}] },
-  { id:"celos_amor", tag:"Vínculo", type:"single", text:"Los celos ¿son una prueba de amor?",
+  { id:"celos_amor", tag:"Vínculo", type:"single", text:"Los celos, ¿son una prueba de amor?",
     options:[{l:"No",score:1},{l:"A veces",score:.5},{l:"Sí",score:0}] },
   { id:"identificar_dano", tag:"Vínculo", type:"single", text:"¿Sabrías identificar cuándo una relación te hace mal?",
     options:[{l:"Sí, siempre",score:1},{l:"A veces",score:.5},{l:"No sabría",score:0}] },
@@ -540,9 +505,6 @@ const QUESTIONS = [
 
 const TAG_CLASS = { "Datos":"tag-datos", "Saber":"tag-saber", "Vínculo":"tag-vinculo", "Voz":"tag-voz" };
 
-/* =====================================================================
-   ESTADO
-   ===================================================================== */
 let state = { device:null, qIndex:0, answers:{}, submitted:false, resultsData:null };
 
 function show(id){
@@ -551,9 +513,6 @@ function show(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-/* =====================================================================
-   SONIDO (Web Audio API, sin archivos externos)
-   ===================================================================== */
 let actx;
 function audioCtx(){ if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); } return actx; }
 function tone(freq, dur, type, gain){
@@ -575,9 +534,6 @@ function playSelect(){ tone(700,0.12,'sine',0.06); setTimeout(()=>tone(920,0.14,
 function playSuccess(){ [523,659,784,1047].forEach((f,i)=>setTimeout(()=>tone(f,0.28,'sine',0.055),i*110)); }
 function playWhoosh(){ tone(180,0.25,'sawtooth',0.03); }
 
-/* =====================================================================
-   DEVICE SELECT
-   ===================================================================== */
 (function detectDevice(){
   const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   const narrow = window.innerWidth < 820;
@@ -593,9 +549,6 @@ function selectDevice(d){
   show('screen-intro');
 }
 
-/* =====================================================================
-   SURVEY FLOW
-   ===================================================================== */
 function startSurvey(){
   playWhoosh();
   state.qIndex = 0;
@@ -683,9 +636,6 @@ function nextQuestion(){
   }
 }
 
-/* =====================================================================
-   FINALIZAR + GUARDAR
-   ===================================================================== */
 async function finishSurvey(){
   playSuccess();
   const payload = { timestamp: new Date().toISOString() };
@@ -706,9 +656,6 @@ async function finishSurvey(){
   renderAllCharts();
 }
 
-/* =====================================================================
-   RESULTADOS AGREGADOS
-   ===================================================================== */
 async function loadAggregateResults(){
   let all = [];
   if(firebaseReady && db){
@@ -779,9 +726,6 @@ function renderAllCharts(){
   });
 }
 
-/* =====================================================================
-   MENSAJE FINAL PERSONALIZADO
-   ===================================================================== */
 function computeScore(){
   const scored = QUESTIONS.filter(q=>q.options && q.options.some(o=>o.score!==undefined));
   let total=0, max=0;
@@ -804,7 +748,7 @@ function goFinal(){
   let emoji, phrase;
   if(score >= 75){
     emoji = "🌟";
-    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean. Eso también es cuidar!";
+    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean. ¡Eso también es cuidar!";
   } else if(score >= 45){
     emoji = "🌤️";
     phrase = "Vas construyendo una mirada cada vez más clara sobre el consentimiento y los vínculos sanos. Seguir informándote y hablando del tema te va a dar todavía más herramientas.";
@@ -876,9 +820,6 @@ function restartSurvey(){
   show('screen-intro');
 }
 
-/* =====================================================================
-   ADMIN
-   ===================================================================== */
 function openAdminLogin(){ document.getElementById('admin-login-modal').classList.add('active'); }
 function closeModal(id){ document.getElementById(id).classList.remove('active'); }
 
