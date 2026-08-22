@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.13.1/firebase-app-compat.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.13.1/firebase-firestore-compat.min.js"></script>
 
@@ -260,9 +261,17 @@ body{
   background:var(--card); border-radius:18px; padding:20px 18px 10px; margin-bottom:16px;
   border:1px solid rgba(255,255,255,.06);
 }
-.chart-card h3{font-family:var(--font-body); font-size:14.5px; font-weight:700; margin:0 0 12px; color:var(--ink);}
-.chart-card .chart-box{position:relative; height:220px;}
+.chart-card h3{font-family:var(--font-body); font-size:14.5px; font-weight:700; margin:0 0 12px; color:var(--ink); flex:1;}
+.chart-card .chart-box{position:relative; height:240px;}
 .chart-note{font-size:11.5px; color:var(--ink-faint); text-align:center; margin:14px 0 4px;}
+.chart-card-head{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:2px;}
+.toggle-view-btn{
+  background:var(--bg-deep); border:1px solid rgba(255,255,255,.1); color:var(--ink-muted);
+  font-family:var(--font-body); font-size:11px; font-weight:700; padding:6px 12px; border-radius:20px;
+  cursor:pointer; flex:none; transition:all .18s ease; white-space:nowrap;
+}
+.toggle-view-btn:hover{border-color:var(--teal); color:var(--teal); transform:translateY(-1px);}
+.toggle-view-btn:active{transform:scale(.95);}
 
 .final-card{
   background:var(--card); border-radius:var(--radius); padding:40px 26px; text-align:center;
@@ -438,7 +447,7 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
 <script>
 const CONFIG = {
   autores: "Tomas Vargas, Morena Behrendt, Emanuel Eiring, Gabriel Britos",
-  curso: "5° 2°",
+  curso: "5° 2ª",
   tema: "Educación Sexual Integral",
   tituloPortada: "Semáforo de Vínculos",
   subtituloPortada: "Consentimiento y relaciones sanas",
@@ -641,38 +650,124 @@ async function finishSurvey(){
   const payload = { timestamp: new Date().toISOString() };
   QUESTIONS.forEach(q=>{ payload[q.id] = state.answers[q.id]?.value ?? null; });
 
+  const local = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
+  local.push(payload);
+  localStorage.setItem('esi_respuestas_local', JSON.stringify(local));
+
+  let savedToCloud = false;
   if(firebaseReady && db){
     try{
       await db.collection(CONFIG.firestoreCollection).add(payload);
-    }catch(e){ console.warn("No se pudo guardar en Firebase:", e); }
-  } else {
-    const local = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
-    local.push(payload);
-    localStorage.setItem('esi_respuestas_local', JSON.stringify(local));
+      savedToCloud = true;
+    }catch(e){ console.warn("No se pudo guardar en Firebase (revisá las reglas de Firestore):", e); }
   }
+  console.log(savedToCloud ? "Respuesta guardada en Firebase." : "Respuesta guardada solo en este navegador (localStorage).");
 
   await loadAggregateResults();
   show('screen-results');
   renderAllCharts();
 }
 
+function mergeWithLocalBackup(cloudData){
+  const local = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
+  if(cloudData.length === 0) return local;
+  const seen = new Set(cloudData.map(r=>r.timestamp));
+  const extra = local.filter(r=>!seen.has(r.timestamp));
+  return cloudData.concat(extra);
+}
+
 async function loadAggregateResults(){
-  let all = [];
+  let cloud = [];
   if(firebaseReady && db){
     try{
       const snap = await db.collection(CONFIG.firestoreCollection).get();
-      snap.forEach(doc=>all.push(doc.data()));
-    }catch(e){ console.warn(e); }
+      snap.forEach(doc=>cloud.push(doc.data()));
+    }catch(e){ console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e); }
   }
-  if(all.length === 0){
-    all = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]');
-  }
+  const all = mergeWithLocalBackup(cloud);
   state.resultsData = all;
   document.getElementById('results-subtitle').textContent =
     all.length > 1 ? `Basado en ${all.length} respuestas` : `Sos la primera persona en responder — ¡gracias!`;
 }
 
+const PALETTE = ['#FF6B6B','#FFC857','#4ECDC4','#B79CED','#7FB2E5','#F79FB0'];
 const chartInstances = [];
+const chartViewState = {};
+
+function countAnswers(q, data){
+  const counts = {};
+  q.options.forEach(o=>counts[o.l]=0);
+  data.forEach(row=>{
+    const val = row[q.id];
+    if(val==null) return;
+    if(Array.isArray(val)){ val.forEach(v=>{ if(counts[v]!=null) counts[v]++; }); }
+    else if(counts[val]!=null){ counts[val]++; }
+  });
+  return counts;
+}
+
+function buildChartConfig(q, counts, viewType, totalAnswered){
+  const labels = Object.keys(counts);
+  const values = Object.values(counts);
+  const isDoughnut = viewType === 'doughnut';
+
+  return {
+    type: isDoughnut ? 'doughnut' : 'bar',
+    data:{
+      labels,
+      datasets:[{
+        data:values,
+        backgroundColor:PALETTE,
+        hoverBackgroundColor:PALETTE.map(c=>c+'DD'),
+        borderWidth:isDoughnut?3:0,
+        borderColor:'#2B2145',
+        borderRadius: isDoughnut?0:10,
+        hoverOffset: isDoughnut?10:0,
+        borderSkipped:false
+      }]
+    },
+    plugins:[ChartDataLabels],
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      indexAxis: (!isDoughnut && q.type==='multi') ? 'y' : 'x',
+      animation:{ duration:900, easing:'easeOutQuart' },
+      cutout: isDoughnut ? '62%' : undefined,
+      interaction:{ mode:'nearest', intersect:true },
+      onHover:(evt,elements)=>{ evt.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+      plugins:{
+        legend:{ display:isDoughnut, position:'bottom', labels:{color:'#C9BFE0', font:{size:11}, boxWidth:12, padding:12} },
+        tooltip:{
+          backgroundColor:'#1B1329', titleColor:'#F7F1E8', bodyColor:'#C9BFE0',
+          borderColor:'rgba(255,255,255,.1)', borderWidth:1, padding:10, cornerRadius:10,
+          callbacks:{ label:(ctx)=>{
+            const total = ctx.dataset.data.reduce((a,b)=>a+b,0) || 1;
+            const pct = Math.round(ctx.raw/total*100);
+            return ` ${ctx.label}: ${ctx.raw} (${pct}%)`;
+          }}
+        },
+        datalabels:{
+          color:'#F7F1E8', font:{weight:700, size:11},
+          formatter:(val,ctx)=>{
+            const total = ctx.dataset.data.reduce((a,b)=>a+b,0) || 1;
+            const pct = Math.round(val/total*100);
+            return val>0 ? pct+'%' : '';
+          },
+          anchor: isDoughnut?'center':(q.type==='multi'?'end':'center'),
+          align: isDoughnut?'center':(q.type==='multi'?'right':'top'),
+          offset: isDoughnut?0:4
+        }
+      },
+      scales: (!isDoughnut) ? (q.type==='multi' ? {
+        x:{ ticks:{color:'#C9BFE0', precision:0}, grid:{color:'rgba(255,255,255,.06)'} },
+        y:{ ticks:{color:'#C9BFE0', font:{size:11}}, grid:{display:false} }
+      } : {
+        x:{ ticks:{color:'#C9BFE0', font:{size:11}}, grid:{display:false} },
+        y:{ ticks:{color:'#C9BFE0', precision:0}, grid:{color:'rgba(255,255,255,.06)'} }
+      }) : {}
+    }
+  };
+}
+
 function renderAllCharts(){
   chartInstances.forEach(c=>c.destroy());
   chartInstances.length = 0;
@@ -680,49 +775,35 @@ function renderAllCharts(){
   container.innerHTML = '';
   const data = state.resultsData || [];
 
-  QUESTIONS.forEach(q=>{
+  QUESTIONS.forEach((q, qi)=>{
     if(q.type === 'text') return;
-    const counts = {};
-    q.options.forEach(o=>counts[o.l]=0);
-    data.forEach(row=>{
-      const val = row[q.id];
-      if(val==null) return;
-      if(Array.isArray(val)){ val.forEach(v=>{ if(counts[v]!=null) counts[v]++; }); }
-      else if(counts[val]!=null){ counts[val]++; }
-    });
+    const counts = countAnswers(q, data);
+    const defaultView = q.type==='multi' ? 'bar' : 'doughnut';
+    if(chartViewState[q.id] === undefined) chartViewState[q.id] = defaultView;
 
     const card = document.createElement('div');
     card.className = 'chart-card';
-    card.innerHTML = `<h3>${q.text}</h3><div class="chart-box"><canvas></canvas></div>`;
+    card.innerHTML = `
+      <div class="chart-card-head">
+        <h3>${q.text}</h3>
+        <button type="button" class="toggle-view-btn" data-qid="${q.id}">⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}</button>
+      </div>
+      <div class="chart-box"><canvas></canvas></div>`;
     container.appendChild(card);
     const ctx = card.querySelector('canvas').getContext('2d');
 
-    const palette = ['#FF6B6B','#FFC857','#4ECDC4','#B79CED','#7FB2E5','#F79FB0'];
-    const inst = new Chart(ctx, {
-      type: q.type==='multi' ? 'bar' : 'doughnut',
-      data:{
-        labels:Object.keys(counts),
-        datasets:[{
-          data:Object.values(counts),
-          backgroundColor:palette,
-          borderWidth:0,
-          borderRadius: q.type==='multi'?8:0
-        }]
-      },
-      options:{
-        responsive:true, maintainAspectRatio:false,
-        indexAxis: q.type==='multi' ? 'y' : 'x',
-        plugins:{
-          legend:{ display:q.type!=='multi', position:'bottom', labels:{color:'#C9BFE0', font:{size:11}, boxWidth:12} },
-          tooltip:{ callbacks:{} }
-        },
-        scales: q.type==='multi' ? {
-          x:{ ticks:{color:'#C9BFE0', precision:0}, grid:{color:'rgba(255,255,255,.06)'} },
-          y:{ ticks:{color:'#C9BFE0', font:{size:11}}, grid:{display:false} }
-        } : {}
-      }
-    });
+    const inst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
     chartInstances.push(inst);
+
+    card.querySelector('.toggle-view-btn').addEventListener('click', (e)=>{
+      playClick();
+      chartViewState[q.id] = chartViewState[q.id] === 'doughnut' ? 'bar' : 'doughnut';
+      e.target.textContent = `⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}`;
+      inst.destroy();
+      const idx = chartInstances.indexOf(inst);
+      const newInst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
+      chartInstances[idx] = newInst;
+    });
   });
 }
 
@@ -737,6 +818,55 @@ function computeScore(){
   return max>0 ? Math.round((total/max)*100) : 50;
 }
 
+const MESSAGE_BANDS = [
+  { min:0, max:19, emoji:"🌱", phrases:[
+    "Este es un gran punto de partida: cuanto más sepas sobre consentimiento y vínculos sanos, más herramientas vas a tener para cuidarte y cuidar a quienes te rodean.",
+    "Nadie nace sabiendo todo esto, se aprende, se conversa, se pregunta. Vos ya diste el primer paso al responder esta encuesta.",
+    "Informarte sobre estos temas es un acto de cuidado propio. Seguí buscando, preguntando y hablando con quienes confiás.",
+    "Hay mucho por descubrir todavía, y eso está bien. Cada conversación que tengas sobre este tema te va a sumar herramientas nuevas.",
+    "El primer paso para construir vínculos sanos es animarte a aprender sobre ellos, y vos ya lo diste hoy.",
+    "Todavía tenés mucho camino para recorrer en este tema, y ese camino se hace más fácil hablándolo con otros."
+  ]},
+  { min:20, max:39, emoji:"🌿", phrases:[
+    "Ya tenés algunas ideas claras sobre estos temas. Seguir profundizando te va a ayudar a reconocer mejor lo que te hace bien.",
+    "Vas por un buen camino. Hablar de esto con amigos, familia o docentes te va a sumar más herramientas todavía.",
+    "Tenés una base para seguir construyendo. Cada pregunta que te hacés sobre tus vínculos es un paso adelante.",
+    "Estás empezando a formarte una mirada propia sobre el consentimiento. Seguí nutriéndola con información y diálogo.",
+    "Lo que ya sabés es un buen cimiento. Sumá más información y vas a sentirte cada vez más segura/o en tus vínculos.",
+    "Vas construyendo tu propio criterio, y eso lleva tiempo. Seguí aprendiendo a tu ritmo."
+  ]},
+  { min:40, max:59, emoji:"🌤️", phrases:[
+    "Tenés una mirada equilibrada sobre estos temas. Seguir informándote te va a dar aún más claridad.",
+    "Vas entendiendo bastante bien de qué se trata el consentimiento y los vínculos sanos. ¡Seguí así!",
+    "Estás en un buen punto medio: sabés varias cosas importantes y todavía te queda espacio para seguir creciendo.",
+    "Tu mirada sobre los vínculos sanos ya tiene bases sólidas. Profundizarla te va a dar más seguridad todavía.",
+    "Vas entendiendo el tema con criterio propio. Seguí conversándolo, porque cada intercambio suma.",
+    "Tenés herramientas valiosas y espacio para seguir sumando más. Ese es un gran lugar desde donde seguir aprendiendo."
+  ]},
+  { min:60, max:79, emoji:"☀️", phrases:[
+    "Tenés una mirada bastante clara sobre el consentimiento y los vínculos sanos. Seguí compartiendo lo que sabés con quienes te rodean.",
+    "Vas muy bien encaminado/a. Tu criterio sobre estos temas ya es sólido, y seguir aprendiendo lo va a hacer todavía más fuerte.",
+    "Se nota que pensaste estos temas con cuidado. Seguí confiando en esa mirada crítica que estás construyendo.",
+    "Tenés una base sólida para reconocer vínculos sanos. Compartir lo que sabés también ayuda a otros a aprender.",
+    "Vas construyendo relaciones desde un lugar informado y consciente. Eso es un montón.",
+    "Tu forma de pensar el consentimiento y los vínculos ya es bastante madura. Seguí cultivándola."
+  ]},
+  { min:80, max:100, emoji:"🌟", phrases:[
+    "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Compartir esa mirada con otros también es una forma de cuidar.",
+    "Tu criterio sobre consentimiento y vínculos sanos es muy claro. Sos un ejemplo de que esto se puede aprender y transmitir.",
+    "Pensás estos temas con mucha claridad. Seguí sosteniendo esa mirada, y animate a compartirla con quienes te rodean.",
+    "Tenés una comprensión muy sólida sobre el consentimiento y las relaciones sanas. Eso también te convierte en alguien con quien otros pueden hablar del tema.",
+    "Se nota que reflexionaste mucho sobre esto. Esa mirada crítica y cuidadosa vale muchísimo para vos y para tu entorno.",
+    "Tenés bases muy firmes en este tema. Seguí construyendo vínculos desde el respeto y el diálogo, como venís haciendo."
+  ]}
+];
+
+function pickMessage(score){
+  const band = MESSAGE_BANDS.find(b => score >= b.min && score <= b.max) || MESSAGE_BANDS[2];
+  const phrase = band.phrases[Math.floor(Math.random()*band.phrases.length)];
+  return { emoji: band.emoji, phrase };
+}
+
 function goFinal(){
   playWhoosh();
   const score = computeScore();
@@ -745,17 +875,7 @@ function goFinal(){
   const emojiEl = document.getElementById('final-emoji');
   const phraseEl = document.getElementById('final-phrase');
 
-  let emoji, phrase;
-  if(score >= 75){
-    emoji = "🌟";
-    phrase = "Tenés herramientas sólidas para reconocer y construir vínculos sanos. Seguí cultivando esa mirada crítica, y compartila con quienes te rodean. ¡Eso también es cuidar!";
-  } else if(score >= 45){
-    emoji = "🌤️";
-    phrase = "Vas construyendo una mirada cada vez más clara sobre el consentimiento y los vínculos sanos. Seguir informándote y hablando del tema te va a dar todavía más herramientas.";
-  } else {
-    emoji = "🌱";
-    phrase = "Este es un buen momento para seguir aprendiendo sobre consentimiento y vínculos sanos. Nadie nace sabiendo esto. Informarte es un acto de cuidado hacia vos y hacia los demás.";
-  }
+  const { emoji, phrase } = pickMessage(score);
   emojiEl.textContent = emoji;
   phraseEl.textContent = phrase;
   launchConfetti();
@@ -841,23 +961,27 @@ async function loadAdminPanel(){
   document.getElementById('admin-loader').style.display='flex';
   document.getElementById('admin-table-wrap').style.display='none';
 
-  let all = [];
+  let cloud = [];
+  let cloudError = null;
   if(firebaseReady && db){
     try{
       const snap = await db.collection(CONFIG.firestoreCollection).orderBy('timestamp','desc').get();
-      snap.forEach(doc=>all.push(doc.data()));
-    }catch(e){ console.warn(e); }
+      snap.forEach(doc=>cloud.push(doc.data()));
+    }catch(e){ cloudError = e; console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e); }
   }
-  if(all.length===0){
-    all = JSON.parse(localStorage.getItem('esi_respuestas_local')||'[]').reverse();
-  }
+  const all = mergeWithLocalBackup(cloud);
   window.__adminData = all;
 
   document.getElementById('admin-loader').style.display='none';
   document.getElementById('admin-stats').innerHTML = `
     <div class="stat-pill"><b>${all.length}</b><span>respuestas totales</span></div>
-    <div class="stat-pill"><b>${firebaseReady?'Firebase':'Local'}</b><span>fuente de datos</span></div>
+    <div class="stat-pill"><b>${cloud.length}</b><span>en Firebase</span></div>
+    <div class="stat-pill"><b>${all.length-cloud.length}</b><span>solo locales</span></div>
   `;
+  if(cloudError){
+    document.getElementById('admin-table-wrap').insertAdjacentHTML('beforebegin',
+      `<p style="color:var(--coral); font-size:12.5px; margin:6px 0 10px;">⚠ No se pudo conectar con Firebase. Mostrando solo las respuestas guardadas en este navegador. Revisá las reglas de Firestore (ver instrucciones del docente).</p>`);
+  }
 
   const cols = ['timestamp', ...QUESTIONS.map(q=>q.id)];
   let thead = '<tr>' + cols.map(c=>`<th>${c}</th>`).join('') + '</tr>';
