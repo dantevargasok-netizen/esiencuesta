@@ -365,6 +365,19 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     </div>
   </section>
 
+  <section class="screen" id="screen-already">
+    <div class="portada">
+      <span class="traffic-emoji">✅</span>
+      <h1>¡Ya respondiste esta encuesta!</h1>
+      <p class="subtitle">Gracias por tu tiempo. Cada persona puede completarla una sola vez desde este dispositivo.</p>
+      <div class="resource-box" style="text-align:left;">
+        <b>¿Necesitás hablar con alguien?</b><br>
+        Línea 144 (violencia de género, las 24 hs) · Un/a docente, preceptor/a o adulto de confianza también puede ayudarte a buscar información y acompañamiento.
+      </div>
+      <p class="small-note">Si necesitás volver a completarla (por ejemplo, para una demostración), pedile a quien administra la encuesta que la habilite desde el panel docente.</p>
+    </div>
+  </section>
+
   <section class="screen" id="screen-intro">
     <div class="portada">
       <div class="semaforo-mini">
@@ -398,6 +411,7 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
         <h2>Así respondió el grupo</h2>
         <p id="results-subtitle">Cargando respuestas...</p>
       </div>
+      <div id="results-error" style="display:none; background:var(--coral-dim); color:var(--coral); border-radius:12px; padding:12px 14px; font-size:13px; margin-bottom:16px;"></div>
       <div id="charts-container"></div>
       <button class="big-btn" onclick="goFinal()">Ver mi mensaje final →</button>
     </div>
@@ -413,7 +427,7 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
         <b>¿Necesitás hablar con alguien?</b><br>
         Línea 144 (violencia de género, las 24 hs) · Un/a docente, preceptor/a o adulto de confianza también puede ayudarte a buscar información y acompañamiento.
       </div>
-      <button class="big-btn secondary" onclick="restartSurvey()">Responder de nuevo</button>
+      <p class="small-note">✅ Tu respuesta ya fue registrada. ¡Gracias por participar!</p>
     </div>
   </section>
 
@@ -436,11 +450,20 @@ table.admin-table th{background:var(--bg-deep); color:var(--ink-muted); position
     <button class="close-x" onclick="closeModal('admin-panel-modal')">✕</button>
     <h3>📋 Respuestas recibidas</h3>
     <div class="admin-stats" id="admin-stats"></div>
-    <button class="nav-btn back" style="margin-bottom:10px;" onclick="exportCSV()">⬇ Descargar CSV</button>
+    <div id="admin-cloud-warning" style="display:none; color:var(--coral); font-size:12.5px; margin:6px 0 10px;"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+      <button class="nav-btn back" onclick="exportCSV()">⬇ Descargar CSV</button>
+      <button class="nav-btn back" onclick="adminAllowResubmit()">🔄 Responder de nuevo (este dispositivo)</button>
+    </div>
     <div class="loader" id="admin-loader"><div class="spinner"></div> Cargando datos de Firebase...</div>
     <div class="admin-table-wrap" id="admin-table-wrap" style="display:none;">
       <table class="admin-table" id="admin-table"></table>
     </div>
+    <details style="margin-top:18px;">
+      <summary style="cursor:pointer; color:var(--ink-muted); font-size:13px; font-weight:700;">🛠 Registro de errores</summary>
+      <div id="admin-error-log" style="margin-top:10px; font-size:12px; color:var(--ink-muted); max-height:200px; overflow-y:auto;"></div>
+      <button class="nav-btn back" style="margin-top:10px; font-size:12px; padding:8px;" onclick="clearErrorLog()">Limpiar registro</button>
+    </details>
   </div>
 </div>
 
@@ -470,15 +493,39 @@ document.getElementById('tema-eyebrow').textContent = CONFIG.tema;
 document.getElementById('titulo-portada').textContent = CONFIG.tituloPortada;
 document.getElementById('subtitulo-portada').textContent = CONFIG.subtituloPortada;
 
+/* =====================================================================
+   REGISTRO DE ERRORES — para poder ver en el panel de admin qué falló
+   ===================================================================== */
+function logError(context, err){
+  try{
+    const log = JSON.parse(localStorage.getItem('esi_error_log')||'[]');
+    const message = (err && err.message) ? err.message : String(err);
+    log.push({ ts:new Date().toISOString(), context, message });
+    while(log.length>50) log.shift();
+    localStorage.setItem('esi_error_log', JSON.stringify(log));
+  }catch(e){ /* si ni siquiera esto funciona, no hay mucho más para hacer */ }
+}
+window.addEventListener('error', e=>{ logError('error global', e.error || e.message || 'Error desconocido'); });
+window.addEventListener('unhandledrejection', e=>{ logError('promesa sin resolver', e.reason); });
+
 let db = null;
 let firebaseReady = false;
+let firebaseInitError = null;
 try{
-  if(CONFIG.firebaseConfig.apiKey !== "TU_API_KEY"){
-    firebase.initializeApp(CONFIG.firebaseConfig);
-    db = firebase.firestore();
-    firebaseReady = true;
+  if(typeof firebase === 'undefined'){
+    throw new Error('El SDK de Firebase no se cargó (¿CDN bloqueado por un adblocker o sin conexión?)');
   }
-}catch(e){ console.warn("Firebase no inicializado:", e); }
+  if(CONFIG.firebaseConfig.apiKey === "TU_API_KEY"){
+    throw new Error('Todavía no configuraste firebaseConfig con los datos reales de tu proyecto de Firebase.');
+  }
+  firebase.initializeApp(CONFIG.firebaseConfig);
+  db = firebase.firestore();
+  firebaseReady = true;
+}catch(e){
+  firebaseInitError = e;
+  logError('firebase-init', e);
+  console.warn("Firebase no inicializado:", e);
+}
 
 const QUESTIONS = [
   { id:"edad", tag:"Datos", type:"single", text:"¿Qué edad tenés?",
@@ -548,6 +595,24 @@ function playWhoosh(){ tone(180,0.25,'sawtooth',0.03); }
   const narrow = window.innerWidth < 820;
   const suggested = (isTouch && narrow) ? 'mobile' : 'desktop';
   document.getElementById(suggested === 'mobile' ? 'btn-mobile':'btn-desktop').classList.add('suggested');
+})();
+
+/* =====================================================================
+   BLOQUEO DE UNA SOLA RESPUESTA POR DISPOSITIVO
+   ===================================================================== */
+function hasAlreadySubmitted(){
+  try{
+    return JSON.parse(localStorage.getItem('esi_submitted')||'null')?.done === true;
+  }catch(e){ return false; }
+}
+function markAsSubmitted(){
+  localStorage.setItem('esi_submitted', JSON.stringify({ done:true, ts:new Date().toISOString() }));
+}
+(function checkAlreadySubmitted(){
+  if(hasAlreadySubmitted()){
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById('screen-already').classList.add('active');
+  }
 })();
 
 function selectDevice(d){
@@ -659,10 +724,16 @@ async function finishSurvey(){
     try{
       await db.collection(CONFIG.firestoreCollection).add(payload);
       savedToCloud = true;
-    }catch(e){ console.warn("No se pudo guardar en Firebase (revisá las reglas de Firestore):", e); }
+    }catch(e){
+      logError('firestore-write', e);
+      console.warn("No se pudo guardar en Firebase (revisá las reglas de Firestore):", e);
+    }
+  } else if(firebaseInitError){
+    logError('firestore-write (firebase no disponible)', firebaseInitError);
   }
   console.log(savedToCloud ? "Respuesta guardada en Firebase." : "Respuesta guardada solo en este navegador (localStorage).");
 
+  markAsSubmitted();
   await loadAggregateResults();
   show('screen-results');
   renderAllCharts();
@@ -678,11 +749,21 @@ function mergeWithLocalBackup(cloudData){
 
 async function loadAggregateResults(){
   let cloud = [];
+  const errBox = document.getElementById('results-error');
+  errBox.style.display = 'none';
   if(firebaseReady && db){
     try{
       const snap = await db.collection(CONFIG.firestoreCollection).get();
       snap.forEach(doc=>cloud.push(doc.data()));
-    }catch(e){ console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e); }
+    }catch(e){
+      logError('firestore-read', e);
+      console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e);
+      errBox.style.display = 'block';
+      errBox.textContent = '⚠ No se pudieron cargar los datos de Firebase (' + (e.message||e) + '). Mostrando solo tu respuesta y las guardadas en este navegador.';
+    }
+  } else if(firebaseInitError){
+    errBox.style.display = 'block';
+    errBox.textContent = '⚠ Firebase no está conectado (' + firebaseInitError.message + '). Mostrando solo las respuestas guardadas en este navegador.';
   }
   const all = mergeWithLocalBackup(cloud);
   state.resultsData = all;
@@ -769,42 +850,57 @@ function buildChartConfig(q, counts, viewType, totalAnswered){
 }
 
 function renderAllCharts(){
+  const errBox = document.getElementById('results-error');
   chartInstances.forEach(c=>c.destroy());
   chartInstances.length = 0;
   const container = document.getElementById('charts-container');
   container.innerHTML = '';
   const data = state.resultsData || [];
 
-  QUESTIONS.forEach((q, qi)=>{
-    if(q.type === 'text') return;
-    const counts = countAnswers(q, data);
-    const defaultView = q.type==='multi' ? 'bar' : 'doughnut';
-    if(chartViewState[q.id] === undefined) chartViewState[q.id] = defaultView;
+  if(typeof Chart === 'undefined'){
+    const msg = 'La librería de gráficos (Chart.js) no se cargó. Puede ser un bloqueador de anuncios/scripts o falta de conexión al CDN.';
+    logError('chart-render', msg);
+    errBox.style.display = 'block';
+    errBox.textContent = '⚠ ' + msg;
+    return;
+  }
 
-    const card = document.createElement('div');
-    card.className = 'chart-card';
-    card.innerHTML = `
-      <div class="chart-card-head">
-        <h3>${q.text}</h3>
-        <button type="button" class="toggle-view-btn" data-qid="${q.id}">⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}</button>
-      </div>
-      <div class="chart-box"><canvas></canvas></div>`;
-    container.appendChild(card);
-    const ctx = card.querySelector('canvas').getContext('2d');
+  try{
+    QUESTIONS.forEach((q, qi)=>{
+      if(q.type === 'text') return;
+      const counts = countAnswers(q, data);
+      const defaultView = q.type==='multi' ? 'bar' : 'doughnut';
+      if(chartViewState[q.id] === undefined) chartViewState[q.id] = defaultView;
 
-    const inst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
-    chartInstances.push(inst);
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      card.innerHTML = `
+        <div class="chart-card-head">
+          <h3>${q.text}</h3>
+          <button type="button" class="toggle-view-btn" data-qid="${q.id}">⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}</button>
+        </div>
+        <div class="chart-box"><canvas></canvas></div>`;
+      container.appendChild(card);
+      const ctx = card.querySelector('canvas').getContext('2d');
 
-    card.querySelector('.toggle-view-btn').addEventListener('click', (e)=>{
-      playClick();
-      chartViewState[q.id] = chartViewState[q.id] === 'doughnut' ? 'bar' : 'doughnut';
-      e.target.textContent = `⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}`;
-      inst.destroy();
-      const idx = chartInstances.indexOf(inst);
-      const newInst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
-      chartInstances[idx] = newInst;
+      const inst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
+      chartInstances.push(inst);
+
+      card.querySelector('.toggle-view-btn').addEventListener('click', (e)=>{
+        playClick();
+        chartViewState[q.id] = chartViewState[q.id] === 'doughnut' ? 'bar' : 'doughnut';
+        e.target.textContent = `⇄ ${chartViewState[q.id]==='doughnut' ? 'ver barras' : 'ver dona'}`;
+        inst.destroy();
+        const idx = chartInstances.indexOf(inst);
+        const newInst = new Chart(ctx, buildChartConfig(q, counts, chartViewState[q.id]));
+        chartInstances[idx] = newInst;
+      });
     });
-  });
+  }catch(e){
+    logError('chart-render', e);
+    errBox.style.display = 'block';
+    errBox.textContent = '⚠ Hubo un error dibujando los gráficos: ' + (e.message||e) + '. Detalle en el panel de admin.';
+  }
 }
 
 function computeScore(){
@@ -952,14 +1048,49 @@ function tryAdminLogin(){
     closeModal('admin-login-modal');
     document.getElementById('admin-panel-modal').classList.add('active');
     loadAdminPanel();
+    renderErrorLog();
   } else {
     err.style.display='block';
   }
 }
 
+function adminAllowResubmit(){
+  localStorage.removeItem('esi_submitted');
+  state.qIndex = 0;
+  state.answers = {};
+  alert('Listo. Este dispositivo ya puede volver a responder la encuesta desde el inicio.');
+  closeModal('admin-panel-modal');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-device').classList.add('active');
+}
+
+function renderErrorLog(){
+  const box = document.getElementById('admin-error-log');
+  let log = [];
+  try{ log = JSON.parse(localStorage.getItem('esi_error_log')||'[]'); }catch(e){}
+  if(log.length === 0){
+    box.innerHTML = '<p style="color:var(--ink-faint);">Sin errores registrados en este dispositivo. 🎉</p>';
+    return;
+  }
+  box.innerHTML = log.slice().reverse().map(entry=>{
+    const d = new Date(entry.ts);
+    return `<div style="border-bottom:1px solid rgba(255,255,255,.06); padding:6px 0;">
+      <b style="color:var(--coral);">${entry.context}</b> · <span style="color:var(--ink-faint);">${d.toLocaleString('es-AR')}</span><br>
+      ${entry.message}
+    </div>`;
+  }).join('');
+}
+
+function clearErrorLog(){
+  localStorage.removeItem('esi_error_log');
+  renderErrorLog();
+}
+
 async function loadAdminPanel(){
   document.getElementById('admin-loader').style.display='flex';
   document.getElementById('admin-table-wrap').style.display='none';
+  const warnBox = document.getElementById('admin-cloud-warning');
+  warnBox.style.display = 'none';
 
   let cloud = [];
   let cloudError = null;
@@ -967,7 +1098,13 @@ async function loadAdminPanel(){
     try{
       const snap = await db.collection(CONFIG.firestoreCollection).orderBy('timestamp','desc').get();
       snap.forEach(doc=>cloud.push(doc.data()));
-    }catch(e){ cloudError = e; console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e); }
+    }catch(e){
+      cloudError = e;
+      logError('admin-firestore-read', e);
+      console.warn("No se pudo leer Firebase (revisá las reglas de Firestore):", e);
+    }
+  } else if(firebaseInitError){
+    cloudError = firebaseInitError;
   }
   const all = mergeWithLocalBackup(cloud);
   window.__adminData = all;
@@ -979,8 +1116,8 @@ async function loadAdminPanel(){
     <div class="stat-pill"><b>${all.length-cloud.length}</b><span>solo locales</span></div>
   `;
   if(cloudError){
-    document.getElementById('admin-table-wrap').insertAdjacentHTML('beforebegin',
-      `<p style="color:var(--coral); font-size:12.5px; margin:6px 0 10px;">⚠ No se pudo conectar con Firebase. Mostrando solo las respuestas guardadas en este navegador. Revisá las reglas de Firestore (ver instrucciones del docente).</p>`);
+    warnBox.style.display = 'block';
+    warnBox.textContent = '⚠ No se pudo conectar con Firebase (' + (cloudError.message||cloudError) + '). Mostrando solo las respuestas guardadas en este navegador. Revisá las reglas de Firestore y la config de firebaseConfig.';
   }
 
   const cols = ['timestamp', ...QUESTIONS.map(q=>q.id)];
